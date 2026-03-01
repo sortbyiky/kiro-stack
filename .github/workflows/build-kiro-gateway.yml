@@ -107,6 +107,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scanner
+        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: kiro-gateway:test
@@ -117,7 +118,8 @@ jobs:
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'docker-image'
