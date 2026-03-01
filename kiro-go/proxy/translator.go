@@ -16,10 +16,12 @@ var modelMap = map[string]string{
 	"claude-sonnet-4.6":        "claude-sonnet-4.6",
 	"claude-haiku-4-5":         "claude-haiku-4.5",
 	"claude-haiku-4.5":         "claude-haiku-4.5",
-	"claude-opus-4-6":         "claude-opus-4.6",
-	"claude-opus-4.6":         "claude-opus-4.6",
+	"claude-opus-4-6":          "claude-opus-4.6",
+	"claude-opus-4.6":          "claude-opus-4.6",
 	"claude-opus-4-5":          "claude-opus-4.5",
 	"claude-opus-4.5":          "claude-opus-4.5",
+	"claude-sonnet-4-5":        "claude-sonnet-4.5",
+	"claude-sonnet-4.5":        "claude-sonnet-4.5",
 	"claude-sonnet-4":          "claude-sonnet-4",
 	"claude-sonnet-4-20250514": "claude-sonnet-4",
 	"claude-3-5-sonnet":        "claude-sonnet-4.5",
@@ -30,6 +32,18 @@ var modelMap = map[string]string{
 	"gpt-4o":                   "claude-sonnet-4.5",
 	"gpt-4-turbo":              "claude-sonnet-4.5",
 	"gpt-3.5-turbo":            "claude-sonnet-4.5",
+	// Kiro-* 前缀映射（Cursor 自定义模型名）
+	"kiro-opus-4-6":            "claude-opus-4.6",
+	"kiro-opus-4.6":            "claude-opus-4.6",
+	"kiro-sonnet-4-6":          "claude-sonnet-4.6",
+	"kiro-sonnet-4.6":          "claude-sonnet-4.6",
+	"kiro-sonnet-4-5":          "claude-sonnet-4.5",
+	"kiro-sonnet-4.5":          "claude-sonnet-4.5",
+	"kiro-haiku-4-5":           "claude-haiku-4.5",
+	"kiro-haiku-4.5":           "claude-haiku-4.5",
+	"kiro-sonnet-4":            "claude-sonnet-4",
+	"kiro-opus-4-5":            "claude-opus-4.5",
+	"kiro-opus-4.5":            "claude-opus-4.5",
 }
 
 // Thinking 模式提示

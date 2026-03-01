@@ -107,6 +107,10 @@ def normalize_model_name(name: str) -> str:
     # Lowercase for consistent matching
     name_lower = name.lower()
     
+    # Kiro-* prefix → Claude-* prefix (Cursor custom model names)
+    if name_lower.startswith('kiro-'):
+        name_lower = 'claude-' + name_lower[5:]
+    
     # Pattern 1: Standard format - claude-{family}-{major}-{minor}(-{suffix})?
     # Matches: claude-haiku-4-5, claude-haiku-4-5-20251001, claude-haiku-4-5-latest
     # Groups: (claude-haiku-4), (5), optional suffix
