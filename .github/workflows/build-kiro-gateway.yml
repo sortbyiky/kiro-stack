@@ -1,0 +1,175 @@
+name: Build kiro-gateway Docker Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'kiro-gateway/**'
+      - '.github/workflows/build-kiro-gateway.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'kiro-gateway/**'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/kiro-gateway
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: 'kiro-gateway/requirements.txt'
+
+      - name: Install dependencies
+        working-directory: ./kiro-gateway
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests with pytest
+        working-directory: ./kiro-gateway
+        run: pytest -v --tb=short
+
+      - name: Generate coverage report
+        if: success()
+        working-directory: ./kiro-gateway
+        run: |
+          pip install pytest-cov
+          pytest --cov=kiro --cov-report=xml --cov-report=term
+
+      - name: Upload coverage to artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: kiro-gateway/coverage.xml
+
+  build:
+    name: Build and Test Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build Docker image for testing
+        uses: docker/build-push-action@v5
+        with:
+          context: ./kiro-gateway
+          push: false
+          load: true
+          tags: kiro-gateway:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: kiro-gateway:test
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'docker-image'
+
+      - name: Test Docker image
+        run: |
+          docker run -d \
+            --name kiro-gateway-test \
+            -p 8000:8000 \
+            -e PROXY_API_KEY="test-key-123" \
+            -e REFRESH_TOKEN="test-token" \
+            kiro-gateway:test
+
+          echo "Waiting for container to start..."
+          sleep 10
+
+          docker ps -a
+          echo "Container logs:"
+          docker logs kiro-gateway-test
+
+          echo "Testing health endpoint..."
+          curl -f http://localhost:8000/health || exit 1
+
+          echo "Testing root endpoint..."
+          curl -f http://localhost:8000/ || exit 1
+
+          echo "Testing models endpoint with auth..."
+          curl -f -H "Authorization: Bearer test-key-123" \
+            http://localhost:8000/v1/models || exit 1
+
+          RESTARTS=$(docker inspect -f '{{.RestartCount}}' kiro-gateway-test)
+          echo "Container restart count: $RESTARTS"
+          if [ "$RESTARTS" -ne 0 ]; then
+            echo "ERROR: Container restarted $RESTARTS times"
+            exit 1
+          fi
+
+          docker stop kiro-gateway-test
+          docker rm kiro-gateway-test
+
+      - name: Build and push Docker image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./kiro-gateway
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image digest
+        if: github.event_name != 'pull_request'
+        run: echo ${{ steps.meta.outputs.digest }}
